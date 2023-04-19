@@ -25,10 +25,22 @@
 
 #define capture()                   \
 {                                   \
+    register void *bp asm ("bp");   \
+    register void *sp asm ("sp");   \
+    cur_tcb->size_ = (int)(long long int)bp - (long long int)sp; \
+    cur_tcb->sp_ = sp;               \
+    memcpy(cur_tcb->stack_, sp, cur_tcb->size_);\
 }
     
 #define sthread_yield()             \
 {                                   \
+    sig_alarm(1);               \
+    if (alarmed && setjmp(cur_tcb->env_) == 0)                    \
+    {                  \
+        capture();                  \
+        longjmp(scheduler_env, 1);\
+    }                               \
+    memcpy(cur_tcb->sp_, cur_tcb->stack_, cur_tcb->size_);\
 }
 
 #define sthread_init()              \
@@ -94,7 +106,7 @@ static void sig_alarm(int signo)
 
 // A function to be executed by a thread
 void (*func)(void *);
-void *args = NULL;
+void *args = nullptr;
 static bool thread_created = false;
 
 static void scheduler() 
